@@ -1,0 +1,586 @@
+---
+title: "Supplemental Figures"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+    toc_depth: 4
+---
+
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r load}
+library(here)
+library(tidyverse)
+library(cowplot)
+library(ggpubr)
+library(ggridges)
+library(sjPlot)
+
+# read in and convert COPAS measurements to uM
+rawdata <- readr::read_csv(here::here("data", "FileS2_raw.csv")) %>%
+  dplyr::mutate(TOF = 1.67110915*TOF + 100.31575759,
+                norm.EXT = 15.68506057*norm.EXT -1.04595184,
+                volume = (pi/4)*TOF*(norm.EXT)^2)
+pruneddata <- readr::read_csv(here::here("data", "FileS3_pruned.csv")) %>%
+  dplyr::mutate(TOF = 1.67110915*TOF + 100.31575759,
+                norm.EXT = 15.68506057*norm.EXT -1.04595184,
+                volume = (pi/4)*TOF*(norm.EXT)^2)
+imagedata <- readr::read_csv(here::here("data", "FileS4_image.csv"))
+```
+
+#### **S1 Fig. Raw measurements of animal size**
+
+```{r S1Fig, fig.height=5.5, fig.width=5.5}
+raw.length <- rawdata %>%
+  dplyr::filter(!replicate %in% c("no food", "no worms")) %>%
+  dplyr::mutate(hour = as.numeric(timepoint)) %>%
+  ggplot() +
+  aes(x = hour, y = TOF) +
+  geom_jitter(size = 0.01, width = 0.2, alpha = 0.009)+
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  labs(x="Time (hours)", y = expression(paste("Length (", mu,"m)"))) +
+  theme_cowplot(font_size = 10, rel_small = 8/10)
+
+raw.width <- rawdata %>%
+  dplyr::filter(!replicate %in% c("no food", "no worms")) %>%
+  dplyr::mutate(hour = as.numeric(timepoint)) %>%
+  ggplot() +
+  aes(x = hour, y = norm.EXT) +
+  geom_jitter(size = 0.01, width = 0.2, alpha = 0.009)+
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  labs(x="Time (hours)", y = expression(paste("Width (", mu,"m)"))) +
+  theme_cowplot(font_size = 10, rel_small = 8/10)
+
+raw.volume <- rawdata %>%
+  dplyr::filter(!replicate %in% c("no food", "no worms")) %>%
+  dplyr::mutate(hour = as.numeric(timepoint)) %>%
+  ggplot() +
+  aes(x = hour, y = volume) +
+  geom_jitter(size = 0.01, width = 0.2, alpha = 0.009)+
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  labs(x="Time (hours)", y = expression(paste("log Volume (", mu,m^3,")"))) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  scale_y_log10()
+
+figS1 <- cowplot::plot_grid(raw.length, raw.width, raw.volume, nrow = 3, ncol = 1, align = "hv", labels = "AUTO", label_size = 10)
+figS1
+
+```
+```{r eval=FALSE, include=FALSE}
+ggplot2::ggsave(here::here("figures", "S1Fig.png"), plot = figS1, device = "png", width = 5.2, height = 5.5, units = "in", dpi = 300)
+```
+
+
+#### **S2 Fig. Correlation analysis of body size measurements**
+
+```{r S2Fig, fig.height=3, fig.width=7.5}
+sorter <- pruneddata %>%
+  dplyr::mutate(hour = timepoint, row = row, column = col) %>%
+  dplyr::group_by(hour, row, column) %>%
+  dplyr::summarize(s_length = median(TOF), s_width = median(norm.EXT), 
+                   s_area = median(EXT), s_volume = median(volume), .groups = "drop")
+manual <- imagedata %>%
+  tidyr::separate(Well, into=c("row","column"), sep=c("(?<=[A-Za-z])(?=[0-9])")) %>%
+  dplyr::mutate(hour = Hour, column = as.numeric(column)) %>%
+  dplyr::group_by(hour, row, column) %>%
+  dplyr::summarize(m_length = median(Length), m_width = median(Width), 
+                   m_volume = median(Volume), m_area = median(Area), .groups = "drop")
+all <- dplyr::inner_join(sorter, manual) 
+
+
+corr.length <- ggpubr::ggscatter(all, x = "s_length", y = "m_length",
+                                 add = "reg.line", conf.int = TRUE, size = 0.3, alpha=0.3, 
+                                 cor.coef = TRUE, cor.method = "kendall", cor.coef.size = 2.8,
+                                 title = "Length & TOF", ylab = "Manual measurements", xlab = "COPAS Biosort measurements") +
+  theme_cowplot(font_size = 10, rel_small = 8/10) 
+
+corr.width <- ggpubr::ggscatter(all, x = "s_width", y = "m_width",
+                                add = "reg.line", conf.int = TRUE, size = 0.3, alpha=0.3,
+                                cor.coef = TRUE, cor.method = "kendall", cor.coef.size = 2.8,
+                                title = "Width & norm.EXT", ylab = "Manual measurements", xlab = "COPAS Biosort measurements") +
+  theme_cowplot(font_size = 10, rel_small = 8/10) 
+
+corr.area <- ggpubr::ggscatter(all, x = "s_area", y = "m_area",
+                               add = "reg.line", conf.int = TRUE, size = 0.3, alpha=0.3,
+                               cor.coef = TRUE, cor.method = "kendall", cor.coef.size = 2.8,
+                               title = "Area & EXT", ylab ="Manual measurements", xlab ="COPAS Biosort measurements") +
+  theme_cowplot(font_size = 10, rel_small = 8/10) 
+
+
+figS2 <- cowplot::plot_grid(corr.length, corr.width, corr.area, ncol = 3, nrow = 1, align = "hv")
+figS2
+```
+```{r eval=FALSE, include=FALSE}
+ggplot2::ggsave(here::here("figures", "S2Fig.png"), plot = figS2, device = "png", width = 7.5, height = 3, units = "in", dpi = 300)
+```
+
+#### **S3 Fig. Gaussian finite mixture modeling of COPAS BIOSORT data**
+```{r S3Fig, fig.height=4, fig.width=7}
+removed <- dplyr::anti_join(rawdata, pruneddata) %>%
+  dplyr::mutate(`Removed ?` = "Yes")
+
+kept <- pruneddata %>%
+  dplyr::mutate(`Removed ?` = "No")
+
+total <- dplyr::full_join(removed, kept)
+
+figS3 <- total %>%
+  dplyr::filter(replicate == "R02" & timepoint %in% c("01","05",10,15,20,25,30,35,40,45,50,55,60,65,70)) %>%
+  ggplot() +
+  aes(x = log(TOF), y = log(EXT), color = `Removed ?`) +
+  scale_color_manual(values = c("#BC3C29FF", "#0072B5FF")) +
+  geom_jitter(size = 0.1, alpha = 0.5) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  facet_wrap(~timepoint, nrow = 3) + panel_border()
+
+figS3  
+```
+```{r eval=FALSE, include=FALSE}
+ggplot2::ggsave(here::here("figures", "S3Fig.png"), plot = figS3, device = "png", width = 7, height = 4, units = "in", dpi = 300)
+```
+
+#### **S1 Table. Results of analysis of variance models fit to COPAS BIOSORT data**
+```{r S1Table}
+red.aov <- pruneddata %>%
+  dplyr::mutate(hour = as.numeric(timepoint), norm.red = red/EXT, well = as.factor(col)) %>%
+  aov(norm.red ~ hour + replicate + well -1, data = .) %>%
+  summary() %>% .[[1]] %>% round(., digits = 2) %>%
+  dplyr::mutate(Terms = rownames(.),
+                `% Var Explained` = round((`Sum Sq`/sum(`Sum Sq`))*100,2)) %>%
+  dplyr::select(Terms, everything())
+
+length.aov <- pruneddata %>%
+  dplyr::mutate(hour = as.numeric(timepoint), well = as.factor(col)) %>%
+  aov(TOF ~ hour + replicate + well -1, data = .) %>%
+  summary() %>% .[[1]] %>% round(., digits = 0) %>%
+  dplyr::mutate(Terms = rownames(.),
+                `% Var Explained` = round((`Sum Sq`/sum(`Sum Sq`))*100,2)) %>%
+  dplyr::select(Terms, everything())
+
+width.aov <- pruneddata %>%
+  dplyr::mutate(hour = as.numeric(timepoint), well = as.factor(col)) %>%
+  aov(norm.EXT ~ hour + replicate + well -1, data = .) %>%
+  summary() %>% .[[1]] %>% round(., digits = 2) %>%
+  dplyr::mutate(Terms = rownames(.),
+                `% Var Explained` = round((`Sum Sq`/sum(`Sum Sq`))*100,2)) %>%
+  dplyr::select(Terms, everything())
+
+volume.aov <- pruneddata %>%
+  dplyr::mutate(hour = as.numeric(timepoint), volume = pi*(norm.EXT/2)^2*TOF, well = as.factor(col)) %>%
+  aov(volume ~ hour + replicate + well -1, data = .) %>%
+  summary() %>% .[[1]] %>% round(., digits = 0) %>%
+  dplyr::mutate(Terms = rownames(.),
+                `% Var Explained` = round((`Sum Sq`/sum(`Sum Sq`))*100,2)) %>%
+  dplyr::select(Terms, everything())
+
+sjPlot::tab_dfs(list(red.aov, length.aov, width.aov, volume.aov), 
+                title = c("Response = Norm.Red", "Response = Length",
+                          "Response = Width", "Response = Volume"),
+                alternate.rows =  T)
+
+```
+```{r eval=FALSE, include=FALSE}
+sjPlot::tab_dfs(list(red.aov, length.aov, width.aov, volume.aov), 
+                title = c("Response = Norm.Red", "Response = Length",
+                          "Response = Width", "Response = Volume"), 
+                file = here::here("figures", "S1Table.html"),
+                alternate.rows =  T)
+```
+
+#### **S4 Fig. Fluorescence measurements normalized by body size**
+```{r S4Fig, fig.height=4, fig.width=7}
+red <- pruneddata %>%
+  dplyr::group_by(replicate, timepoint, row, col) %>%
+  dplyr::summarize(median.red = median(red), .groups = "drop") %>%
+  ggplot(.) +
+  aes(x = as.numeric(timepoint), y = median.red) + 
+  geom_boxplot(aes(group = timepoint), outlier.alpha = 0, alpha = 0.2) +
+  geom_jitter(size=0.09, width=0.2, alpha=0.1) +
+  geom_smooth(span = 0.1, se = F, size = 0.5, method = "loess", color = "#4682b4") +
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  labs(x="Time (hours)", y = "Median red")
+
+redvTOF <- pruneddata %>%
+  dplyr::group_by(replicate, timepoint, row, col) %>%
+  dplyr::summarize(median.red = median(red/TOF), .groups = "drop") %>%
+  ggplot(.) +
+  aes(x = as.numeric(timepoint), y = median.red) + 
+  geom_boxplot(aes(group = timepoint), outlier.alpha = 0, alpha = 0.2) +
+  geom_jitter(size=0.09, width=0.2, alpha=0.1) +
+  geom_smooth(span = 0.1, se = F, size = 0.5, method = "loess", color = "#4682b4") +
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  labs(x="Time (hours)", y = "Median red/TOF")
+
+redvEXT <- pruneddata %>%
+  dplyr::group_by(replicate, timepoint, row, col) %>%
+  dplyr::summarize(median.red = median(red/EXT), .groups = "drop") %>%
+  ggplot(.) +
+  aes(x = as.numeric(timepoint), y = median.red) + 
+  geom_boxplot(aes(group = timepoint), outlier.alpha = 0, alpha = 0.2) +
+  geom_jitter(size=0.09, width=0.2, alpha=0.1) +
+  geom_smooth(span = 0.1, se = F, size = 0.5, method = "loess", color = "#4682b4") +
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  labs(x="Time (hours)", y = "Median red/EXT")
+
+redvVol <- pruneddata %>%
+  dplyr::group_by(replicate, timepoint, row, col) %>%
+  dplyr::summarize(median.red = median(red/volume), .groups = "drop") %>%
+  ggplot(.) +
+  aes(x = as.numeric(timepoint), y = median.red) + 
+  geom_boxplot(aes(group = timepoint), outlier.alpha = 0, alpha = 0.2) +
+  geom_jitter(size=0.09, width=0.2, alpha=0.1) +
+  geom_smooth(span = 0.1, se = F, size = 0.5, method = "loess", color = "#4682b4") +
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  labs(x="Time (hours)", y = "Median red/volume")
+
+figS4 <- cowplot::plot_grid(red, redvTOF, redvEXT, redvVol, labels = "AUTO", ncol = 2, nrow = 2, align = "hv", label_size = 10)
+figS4
+```
+```{r eval=FALSE, include=FALSE}
+ggplot2::ggsave(here::here("figures", "S4Fig.png"), plot = figS4, device = "png", width = 7, height = 4, units = "in", dpi = 300)
+```
+
+
+#### **S5 Fig. Cuticles identified during periods of decreased feeding**
+
+```{r S5Fig, fig.height=3, fig.width=6}
+figS5 <- pruneddata %>%
+  dplyr::mutate(cuticles = case_when(timepoint %in% c(15,16,17,18,19,23,24,25,26,27,33,34,35,36,37,
+                                                      38,39,45,46,47,48,49,50,51,52,53,54,55) ~ "yes",
+                                     TRUE ~ "no")) %>%
+  dplyr::group_by(replicate, timepoint, row, col, cuticles) %>%
+  dplyr::summarize(median.red = median(red/EXT), .groups = "drop") %>%
+  ggplot(.) +
+  aes(x = as.numeric(timepoint), y = median.red) + 
+  geom_boxplot(aes(group = timepoint, color = cuticles), outlier.alpha = 0) +
+  geom_jitter(size=0.1, width=0.2, alpha=0.2, aes(color = cuticles)) +
+  geom_smooth(span = 0.1, se = F, size = 0.5, method = "loess") +
+  scale_x_continuous(breaks = seq(0, 70, 5)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  scale_color_manual(values = c("black", "red")) +
+  labs(x="Time (hours)", y = "Median norm.Red")
+
+figS5
+```
+```{r eval=FALSE, include=FALSE}
+#ggplot2::ggsave(here::here("figures", "S5FigA.png"), plot = figS5, device = "png", width = 7, height = 4, units = "in", dpi = 300)
+```
+
+
+#### **S6 Fig. Volume growth data fit with linear, exponential, and cubic models**
+
+```{r S6Fig, fig.height=4, fig.width=7}
+stage <- pruneddata %>%
+  dplyr::mutate(hour = as.numeric(timepoint),
+                stage = dplyr::case_when(hour <= 6 ~ "L1_1",
+                                         hour > 6 & hour <= 13 ~ "L1_2",
+                                         hour >= 17 & hour <= 22 ~ "L2",
+                                         hour >= 27 & hour <= 32 ~ "L3",
+                                         hour >= 39 & hour <= 45 ~ "L4"),
+                stage = factor(stage, levels = c("L1_1", "L1_2","L2", "L3", "L4", "Adult"))) %>%
+  dplyr::group_by(stage)
+
+L1_1 <- stage %>%
+  dplyr::filter(stage == "L1_1") %>%
+  ggplot() +
+  aes(x = hour, y = volume) +
+  geom_jitter(width = 0.1, size = 0.1, alpha = 0.1) + 
+  geom_smooth(method = "lm", se = F, formula = y~x, color = "#88CCEE", size = 0.5) +
+  geom_smooth(method = "lm", se = F, formula = y~poly(x, degree = 3), color = "#CC6677", size = 0.5) +
+  geom_smooth(method = "nls", se = F, formula = y~exp(m*x + b), 
+              method.args = list(start = c(m=0.07,b=5)), color = "#DDCC77", size = 0.5) +
+  labs(title = "L1_1") + scale_x_continuous(breaks = seq(1, 6, 1)) +
+  scale_y_continuous(limits = c(40000,175000)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  panel_border() + labs(x = "Time (hours)", y = expression(paste("Volume (", mu,m^3,")"))) +
+  geom_text(x = 2, y = 175000, label = "Linear", color = "#88CCEE", size = 3) +
+  geom_text(x = 2, y = 162000, label = "Exponential", color = "#DDCC77", size = 3) +
+  geom_text(x = 2, y = 149000, label = "Cubic", color = "#CC6677", size = 3)
+
+L1_2 <- stage %>%
+  dplyr::filter(stage == "L1_2") %>%
+  ggplot() +
+  aes(x = hour, y = volume) +
+  geom_jitter(width = 0.1, size = 0.1, alpha = 0.1) + 
+  geom_smooth(method = "lm", se = F, formula = y~x, color = "#88CCEE", size = 0.5) +
+  geom_smooth(method = "lm", se = F, formula = y~poly(x, degree = 3), color = "#CC6677", size = 0.5) +
+  geom_smooth(method = "nls", se = F, formula = y~exp(m*x + b), 
+              method.args = list(start = c(m=0.07,b=5)), color = "#DDCC77", size = 0.5) +
+  labs(title = "L1_2") + scale_x_continuous(breaks = seq(7, 13, 1)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  panel_border() + labs(x = "Time (hours)", y = expression(paste("Volume (", mu,m^3,")")))
+
+L2 <- stage %>%
+  dplyr::filter(stage == "L2") %>%
+  ggplot() +
+  aes(x = hour, y = volume) +
+  geom_jitter(width = 0.1, size = 0.1, alpha = 0.1) + #geom_smooth(method = "lm", se = T, formula = y~x, show.legend = T, size = 0.5)
+  geom_smooth(method = "lm", se = F, formula = y~x, color = "#88CCEE", size = 0.5) +
+  geom_smooth(method = "lm", se = F, formula = y~poly(x, degree = 3), color = "#CC6677", size = 0.5) +
+  geom_smooth(method = "nls", se = F, formula = y~exp(m*x + b), 
+              method.args = list(start = c(m=0.07,b=5)), color = "#DDCC77", size = 0.5) +
+  labs(title = "L2") + scale_x_continuous(breaks = seq(17, 23, 1)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+panel_border() + labs(x = "Time (hours)", y = expression(paste("Volume (", mu,m^3,")")))
+
+L3 <- stage %>%
+  dplyr::filter(stage == "L3") %>%
+  ggplot() +
+  aes(x = hour, y = volume) +
+  geom_jitter(width = 0.1, size = 0.1, alpha = 0.1) + #geom_smooth(method = "lm", se = T, formula = y~x, show.legend = T, size = 0.5)
+  geom_smooth(method = "lm", se = F, formula = y~x, color = "#88CCEE", size = 0.5) +
+  geom_smooth(method = "lm", se = F, formula = y~poly(x, degree = 3), color = "#CC6677", size = 0.5) +
+  geom_smooth(method = "nls", se = F, formula = y~exp(m*x + b), 
+              method.args = list(start = c(m=0.1,b=5)), color = "#DDCC77", size = 0.5) +
+  labs(title = "L3") + scale_x_continuous(breaks = seq(27, 32, 1)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  panel_border() + labs(x = "Time (hours)", y = expression(paste("Volume (", mu,m^3,")")))
+
+L4 <- stage %>%
+  dplyr::filter(stage == "L4") %>%
+  ggplot() +
+  aes(x = hour, y = volume) +
+  geom_jitter(width = 0.1, size = 0.1, alpha = 0.1) + #geom_smooth(method = "lm", se = T, formula = y~x, show.legend = T, size = 0.5)
+  geom_smooth(method = "lm", se = F, formula = y~x, color = "#88CCEE", size = 0.5) +
+  geom_smooth(method = "lm", se = F, formula = y~poly(x, degree = 3), color = "#CC6677", size = 0.5) +
+  geom_smooth(method = "nls", se = F, formula = y~exp(m*x + b), 
+              method.args = list(start = c(m=0.07,b=5)), color = "#DDCC77", size = 0.5) +
+  labs(title = "L4") + scale_x_continuous(breaks = seq(39, 45, 1)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  panel_border() + labs(x = "Time (hours)", y = expression(paste("Volume (", mu,m^3,")")))
+
+figS6 <- cowplot::plot_grid(L1_1, L1_2, L2, L3, L4, labels = "AUTO", label_size = 12, nrow = 2, ncol = 3, align = "hv", axis = "tblr")
+figS6
+  
+```
+```{r eval=FALSE, include=FALSE}
+ggplot2::ggsave(here::here("figures", "S6Fig.png"), plot = figS6, device = "png", width = 7.5, height = 5, units = "in", dpi = 300)
+```
+
+
+
+#### **S2 Table. Model fit criteria used to assess candidate growth models**
+
+```{r S2Table}
+tableS2 <- stage %>%
+  dplyr::filter(!stage %in% c(NA)) %>%
+  dplyr::mutate(cubic_AIC = round(AIC(lm(volume~poly(hour, degree = 3))), digits = 0),
+                linear_AIC = round(AIC(lm(volume~hour)), digits = 0),
+                exponential_AIC = round(AIC(nls(volume~ I(exp(1)^(m*hour + b)), start = list(m = 0.08, b = 5),
+                                                control = nls.control(maxiter = 1000))), digits = 0),
+                cubic_BIC = round(BIC(lm(volume~poly(hour, degree = 3))), digits = 0),
+                linear_BIC = round(BIC(lm(volume~hour)), digits = 0),
+                exponential_BIC = round(BIC(nls(volume~ I(exp(1)^(m*hour + b)), start = list(m = 0.08, b = 5),
+                                                control = nls.control(maxiter = 1000))), digits = 0)) %>%
+  dplyr::select(stage, linear_AIC, exponential_AIC, cubic_AIC,
+                linear_BIC, exponential_BIC, cubic_BIC) %>%
+  unique() %>%
+  dplyr::mutate(min.AIC = min(linear_AIC, exponential_AIC, cubic_AIC),
+                min.BIC = min(linear_BIC, exponential_BIC, cubic_BIC),
+                lin.deltaAIC = linear_AIC - min.AIC,
+                exp.deltaAIC = exponential_AIC - min.AIC,
+                cub.deltaAIC = cubic_AIC - min.AIC,
+                lin.deltaBIC = linear_BIC - min.BIC,
+                exp.deltaBIC = exponential_BIC - min.BIC,
+                cub.deltaBIC = cubic_BIC - min.BIC) %>%
+  dplyr::select(stage, lin.deltaAIC,exp.deltaAIC,cub.deltaAIC,lin.deltaBIC,exp.deltaBIC,cub.deltaBIC) %>%
+  dplyr::bind_cols(afit = dplyr::tibble(afit = c("Cubic","Can't distinguish","Cubic","Cubic","Likely Cubic")), 
+                   bfit = dplyr::tibble(bfit = c("Likely Cubic","Can't distinguish","Cubic","Cubic","Linear"))) %>%
+  kableExtra::kbl(col.names = NULL, align = "c") %>%
+  kableExtra::kable_classic(full_width = F) %>%
+  kableExtra::add_header_above(align = "c",
+                               c("Stage","Linear","Exponential","Cubic","Linear","Exponential","Cubic","Best model by AIC","Best model by BIC")) %>%
+  kableExtra::add_header_above(c(" ","$\\Delta AIC$" = 3, "$\\Delta BIC$" = 3, " " = 2))
+
+tableS2
+
+#same table but showing raw AIC/BIC values as well
+tableS2wRaw <- stage %>%
+  dplyr::filter(!stage %in% c(NA)) %>%
+  dplyr::mutate(cubic_AIC = round(AIC(lm(volume~poly(hour, degree = 3))), digits = 0),
+                linear_AIC = round(AIC(lm(volume~hour)), digits = 0),
+                exponential_AIC = round(AIC(nls(volume~ I(exp(1)^(m*hour + b)), start = list(m = 0.08, b = 5),
+                                                control = nls.control(maxiter = 1000))), digits = 0),
+                cubic_BIC = round(BIC(lm(volume~poly(hour, degree = 3))), digits = 0),
+                linear_BIC = round(BIC(lm(volume~hour)), digits = 0),
+                exponential_BIC = round(BIC(nls(volume~ I(exp(1)^(m*hour + b)), start = list(m = 0.08, b = 5),
+                                                control = nls.control(maxiter = 1000))), digits = 0)) %>%
+  dplyr::select(stage, linear_AIC, exponential_AIC, cubic_AIC,
+                linear_BIC, exponential_BIC, cubic_BIC) %>%
+  unique() %>%
+  dplyr::mutate(min.AIC = min(linear_AIC, exponential_AIC, cubic_AIC),
+                min.BIC = min(linear_BIC, exponential_BIC, cubic_BIC),
+                lin.deltaAIC = linear_AIC - min.AIC,
+                exp.deltaAIC = exponential_AIC - min.AIC,
+                cub.deltaAIC = cubic_AIC - min.AIC,
+                lin.deltaBIC = linear_BIC - min.BIC,
+                exp.deltaBIC = exponential_BIC - min.BIC,
+                cub.deltaBIC = cubic_BIC - min.BIC) %>%
+  dplyr::select(-min.AIC, -min.BIC) %>%
+  dplyr::bind_cols(afit = dplyr::tibble(afit = c("Cubic","Can't distinguish","Cubic","Cubic","Likely Cubic")), 
+                   bfit = dplyr::tibble(bfit = c("Likely Cubic","Can't distinguish","Cubic","Cubic","Linear"))) %>%
+  kableExtra::kbl(col.names = NULL, align = "c") %>%
+  kableExtra::kable_classic(full_width = F) %>%
+  kableExtra::add_header_above(align = "c",
+                               c("Stage","Linear","Exponential","Cubic","Linear","Exponential","Cubic","Linear","Exponential","Cubic","Linear","Exponential","Cubic","Best model by AIC","Best model by BIC")) %>%
+  kableExtra::add_header_above(c(" ","$AIC$" = 3, "$BIC$" = 3, "$\\Delta AIC$" = 3, "$\\Delta BIC$" = 3, " " = 2))
+tableS2wRaw
+```
+
+
+#### **S7 Fig. Density plots of population size dynamics across all larval transitions**
+
+```{r S7Fig, fig.height = 8.75, fig.width = 7.5}
+qlength <- pruneddata %>%
+  dplyr::filter(timepoint >= 12, timepoint <= 53) %>%
+  dplyr::group_by(timepoint) %>%
+  dplyr::mutate(volume = pi*(norm.EXT/2)^2*TOF,
+                q20_TOF = as.numeric(stats::quantile(TOF, probs = 0.2, na.rm = TRUE)[1]),
+                q40_TOF = as.numeric(stats::quantile(TOF, probs = 0.4, na.rm = TRUE)[1]),
+                q60_TOF = as.numeric(stats::quantile(TOF, probs = 0.6, na.rm = TRUE)[1]),
+                q80_TOF = as.numeric(stats::quantile(TOF, probs = 0.8, na.rm = TRUE)[1])) %>%
+  dplyr::mutate(quant = dplyr::case_when(TOF <= q20_TOF ~ "Q1",
+                                         TOF > q20_TOF & TOF <= q40_TOF ~ "Q2",
+                                         TOF > q40_TOF & TOF <= q60_TOF ~ "Q3",
+                                         TOF > q60_TOF & TOF <= q80_TOF ~ "Q4",
+                                         TOF >= q80_TOF ~ "Q5")) %>%
+  dplyr::group_by(timepoint, quant) %>%
+  dplyr::mutate(hour = as.numeric(timepoint),
+                norm.red.area = red/EXT,
+                Quiescent = dplyr::case_when(norm.red.area <= 0.06 ~ "yes",
+                                             TRUE ~ "no"),
+                feeding = sum(Quiescent == "no"),
+                notfeeding = sum(Quiescent == "yes"),
+                `% Quiescent` = (notfeeding/(notfeeding + feeding))*100,
+                count = n()) %>%
+  dplyr::ungroup() %>% 
+  ggplot() +
+  aes(x = TOF, y = factor(hour), group = timepoint, point_color = `% Quiescent`) +
+  geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
+                      position = position_points_sina(seed = 2),
+                      point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
+  scale_point_color_gradient(name = "% Quiescent", low = "black", high = "red",
+                             breaks = c(10,20,40,60,80), 
+                             labels = c("10","20","40","60","80")) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) + 
+  theme(legend.position="bottom", legend.background = element_rect(fill="#FFFFFF")) +
+  guides(point_color = guide_legend(override.aes = list(size = 0.001, point_size = 2, point_alpha = 1))) +
+  labs(y ="Time (hours)", x = expression(paste("Length (", mu,"m)")))
+
+qwidth <- pruneddata %>%
+  dplyr::filter(timepoint >= 12, timepoint <= 53) %>%
+  dplyr::group_by(timepoint) %>%
+  dplyr::mutate(volume = pi*(norm.EXT/2)^2*TOF,
+                q20_norm.EXT = as.numeric(stats::quantile(norm.EXT, probs = 0.2, na.rm = TRUE)[1]),
+                q40_norm.EXT = as.numeric(stats::quantile(norm.EXT, probs = 0.4, na.rm = TRUE)[1]),
+                q60_norm.EXT = as.numeric(stats::quantile(norm.EXT, probs = 0.6, na.rm = TRUE)[1]),
+                q80_norm.EXT = as.numeric(stats::quantile(norm.EXT, probs = 0.8, na.rm = TRUE)[1])) %>%
+  dplyr::mutate(quant = dplyr::case_when(norm.EXT <= q20_norm.EXT ~ "Q1",
+                                         norm.EXT > q20_norm.EXT & norm.EXT <= q40_norm.EXT ~ "Q2",
+                                         norm.EXT > q40_norm.EXT & norm.EXT <= q60_norm.EXT ~ "Q3",
+                                         norm.EXT > q60_norm.EXT & norm.EXT <= q80_norm.EXT ~ "Q4",
+                                         norm.EXT >= q80_norm.EXT ~ "Q5")) %>%
+  dplyr::group_by(timepoint, quant) %>%
+  dplyr::mutate(hour = as.numeric(timepoint),
+                norm.red.area = red/EXT,
+                Quiescent = dplyr::case_when(norm.red.area <= 0.06 ~ "yes",
+                                             TRUE ~ "no"),
+                feeding = sum(Quiescent == "no"),
+                notfeeding = sum(Quiescent == "yes"),
+                `% Quiescent` = (notfeeding/(notfeeding + feeding))*100,
+                count = n()) %>%
+  dplyr::ungroup() %>% 
+  ggplot() +
+  aes(x = norm.EXT, y = factor(hour), group = timepoint, point_color = `% Quiescent`) +
+  geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
+                      position = position_points_sina(seed = 2),
+                      point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
+  scale_point_color_gradient(name = "% Quiescent", low = "black", high = "red",
+                             breaks = c(10,20,40,60,80), 
+                             labels = c("10","20","40","60","80")) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) + guides(point_color = F) +
+  labs(y ="Time (hours)", x = expression(paste("Width (", mu,"m)")))
+
+qvolume <- pruneddata %>%
+  dplyr::filter(timepoint >= 12, timepoint <= 53) %>%
+  dplyr::group_by(timepoint) %>%
+  dplyr::mutate(q20_volume = as.numeric(stats::quantile(volume, probs = 0.2, na.rm = TRUE)[1]),
+                q40_volume = as.numeric(stats::quantile(volume, probs = 0.4, na.rm = TRUE)[1]),
+                q60_volume = as.numeric(stats::quantile(volume, probs = 0.6, na.rm = TRUE)[1]),
+                q80_volume = as.numeric(stats::quantile(volume, probs = 0.8, na.rm = TRUE)[1])) %>%
+  dplyr::mutate(quant = dplyr::case_when(volume <= q20_volume ~ "Q1",
+                                         volume > q20_volume & volume <= q40_volume ~ "Q2",
+                                         volume > q40_volume & volume <= q60_volume ~ "Q3",
+                                         volume > q60_volume & volume <= q80_volume ~ "Q4",
+                                         volume >= q80_volume ~ "Q5")) %>%
+  dplyr::group_by(timepoint, quant) %>%
+  dplyr::mutate(hour = as.numeric(timepoint),
+                norm.red.area = red/EXT,
+                Quiescent = dplyr::case_when(norm.red.area <= 0.06 ~ "yes",
+                                             TRUE ~ "no"),
+                feeding = sum(Quiescent == "no"),
+                notfeeding = sum(Quiescent == "yes"),
+                `% Quiescent` = (notfeeding/(notfeeding + feeding))*100,
+                count = n()) %>%
+  dplyr::ungroup() %>% 
+  ggplot() +
+  aes(x = volume, y = factor(hour), group = timepoint, point_color = `% Quiescent`) +
+  geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
+                      position = position_points_sina(seed = 2),
+                      point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
+  scale_point_color_gradient(name = "% Quiescent", low = "black", high = "red",
+                             breaks = c(10,20,40,60,80), 
+                             labels = c("10","20","40","60","80")) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) + guides(point_color = F) +
+  labs(y ="Time (hours)", x = expression(paste("log Volume (", mu,m^3,")"))) 
+
+figS7 <- cowplot::plot_grid(qlength, qwidth, qvolume, labels = "AUTO", ncol = 3, nrow = 1, align = "hv", axis = "tblr",label_size = 12)
+figS7
+
+```
+```{r eval=FALSE, include=FALSE}
+ggplot2::ggsave(here::here("figures", "S7Fig.png"), plot = figS7, device = "png", width = 7.5, height = 8.75, units = "in", dpi = 300)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

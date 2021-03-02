@@ -1,0 +1,303 @@
+---
+title: "Main Figures"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+    toc_depth: 4
+---
+
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r load}
+library(here)
+library(tidyverse)
+library(SplinesUtils)
+library(cowplot)
+library(ggridges)
+library(kableExtra)
+
+# convert COPAS measurements to uM
+rawdata <- readr::read_csv(here::here("data", "FileS2_raw.csv")) %>%
+  dplyr::mutate(TOF = 1.67110915*TOF + 100.31575759,
+                norm.EXT = 15.68506057*norm.EXT -1.04595184,
+                volume = (pi/4)*TOF*(norm.EXT)^2)
+pruneddata <- readr::read_csv(here::here("data", "FileS3_pruned.csv")) %>%
+  dplyr::mutate(TOF = 1.67110915*TOF + 100.31575759,
+                norm.EXT = 15.68506057*norm.EXT -1.04595184,
+                volume = (pi/4)*TOF*(norm.EXT)^2)
+imagedata <- readr::read_csv(here::here("data", "FileS4_image.csv"))
+```
+
+#### **Fig 2. Quantitative raw measurements of animal size**
+
+```{r Fig2, fig.height=5.5, fig.width=5.5}
+pruned.length <- pruneddata %>%
+  dplyr::mutate(hour = as.numeric(timepoint)) %>%
+  ggplot() +
+  aes(x = hour, y = TOF) +
+  geom_jitter(size = 0.01, width = 0.2, alpha = 0.009)+
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  labs(x="Time (hours)", y = expression(paste("Length (", mu,"m)"))) +
+  theme_cowplot(font_size = 10, rel_small = 8/10)
+
+pruned.width <- pruneddata %>%
+  dplyr::mutate(hour = as.numeric(timepoint)) %>%
+  ggplot() +
+  aes(x = hour, y = norm.EXT) +
+  geom_jitter(size = 0.01, width = 0.2, alpha = 0.009)+
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  labs(x="Time (hours)", y = expression(paste("Width (", mu,"m)"))) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) 
+
+pruned.volume <- pruneddata %>%
+  dplyr::mutate(hour = as.numeric(timepoint)) %>%
+  ggplot() +
+  aes(x = hour, y = volume) +
+  geom_jitter(size = 0.01, width = 0.2, alpha = 0.009)+
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  labs(x="Time (hours)", y = expression(paste("log Volume (", mu,m^3,")"))) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  scale_y_log10()
+
+fig2 <- cowplot::plot_grid(pruned.length, pruned.width, pruned.volume, nrow = 3, ncol = 1, align = "hv", labels = "AUTO", label_size = 10)
+fig2
+
+```
+```{r eval=FALSE, include=FALSE}
+ggsave(here::here("figures", "Fig2.png"), plot = fig2, device = "png", width = 5.2, height = 5.5, units = "in", dpi = 300)
+```
+
+
+
+#### **Fig 3. Fluorescence dynamics outline larval stages**
+
+```{r Fig3, fig.height=8.75, fig.width=7}
+# function to calculate local minima
+f.allmin_max <- function() {
+  #step 1
+  ## calculating residuals
+  res <- pruneddata %>%
+    dplyr::mutate(hour = as.numeric(timepoint), norm.red = red/EXT, well = as.factor(col)) %>%
+    aov(norm.red ~ replicate, data = .) %>% residuals()
+  ## summarizing data 
+  medianplate <- pruneddata %>%
+    dplyr::mutate(hour = as.numeric(timepoint), volume = pi*(norm.EXT/2)^2*TOF, norm.red = red/EXT,
+                  resids = res) %>%
+    dplyr::group_by(replicate, hour, timepoint) %>%
+    dplyr::summarize(median.residual.red = median(resids),
+                     median.norm.red = median(norm.red),
+                     median.Length = median(TOF), 
+                     median.Width = median(norm.EXT),
+                     median.Volume = median(volume), .groups = "drop")
+
+  #step 2: kernel regression smoothing using a local plug-in bandwidth
+  step1_deriv <- lokern::lokerns(x=medianplate$hour, y=medianplate$median.residual.red, deriv=1, hetero = T)
+  #step 3: backsolve to find where derivative = 0
+  step2_backsolve <- CubicInterpSplineAsPiecePoly(x=step1_deriv$x.out,y=step1_deriv$est,method="natural")
+  time_min.max <- dplyr::tibble(Hour = solve(step2_backsolve,b=0)) %>%
+    dplyr::filter(Hour > 12, Hour < 55)
+  finalred <- lokern::lokerns(x = medianplate$hour, y = medianplate$median.norm.red, deriv=0, hetero=T)
+  Red_Fluorescence <- predict(finalred, time_min.max$Hour)$y
+  #step 4: plot
+  step0 <- lokern::lokerns(x=medianplate$hour, y=medianplate$median.residual.red, deriv=0, hetero = T)
+  #plot(step0); abline(v=time_min.max$Hour, col="blue")
+  
+  #put it all together
+  values <- time_min.max %>%
+    dplyr::mutate(Peak = c("min","max","min","max","min","max","min","max"),
+                  Num = c(1,2,3,4,5,6,7,8),Red_Fluorescence ) %>%
+    dplyr::select(Num, Peak, Red_Fluorescence, Hour)
+  
+  return(values)
+}
+
+#run function
+min_max <- f.allmin_max()
+
+# extract minima values
+mins <- min_max %>% dplyr::filter(Peak == "min") %>% pull(Hour)
+
+# plot
+red <- pruneddata %>%
+  dplyr::group_by(replicate, timepoint, row, col) %>%
+  dplyr::summarize(median.red = median(red/EXT), .groups = "drop") %>%
+  ggplot(.) +
+  aes(x = as.numeric(timepoint), y = median.red) + 
+  geom_boxplot(aes(group = timepoint), outlier.alpha = 0, alpha = 0.2) +
+  geom_jitter(size=0.1, width=0.2, alpha=0.2) +
+  geom_smooth(span = 0.1, se = F, size = 0.8, method = "loess", color = "#4682b4") +
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  geom_vline(xintercept=c(mins), color="#dd7788", size = 0.3) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  labs(x="Time (hours)", y = "Median norm.Red")
+
+length <- pruneddata %>%
+  dplyr::group_by(timepoint, replicate, row, col) %>%
+  dplyr::summarize(median.Length = median(TOF), .groups = "drop") %>%
+  ggplot(., aes(x = as.numeric(timepoint), y = median.Length)) +
+  geom_boxplot(aes(group = timepoint), outlier.alpha = 0, alpha = 0.1) +
+  geom_jitter(size=0.1, width=0.2, alpha=0.2) +
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  geom_vline(xintercept=c(mins), color="#dd7788", size = 0.3) +
+  labs(x="Time (hours)", y = expression(paste("Median Length (", mu,"m)")))
+
+width <- pruneddata %>%
+  dplyr::group_by(timepoint, replicate, row, col) %>%
+  dplyr::summarize(median.Width = median(norm.EXT), .groups = "drop") %>%
+  ggplot(.) +
+  aes(x = as.numeric(timepoint), y = median.Width) +
+  geom_boxplot(aes(group = timepoint), outlier.alpha = 0, alpha = 0.1) +
+  geom_jitter(size=0.1, width=0.2, alpha=0.2) +
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  geom_vline(xintercept=c(mins), color="#dd7788", size = 0.3) +
+  labs(x="Time (hours)", y = expression(paste("Median Width (", mu,"m)")))
+
+volume <- pruneddata %>%
+  dplyr::group_by(timepoint, replicate, row, col) %>%
+  dplyr::summarize(median.Volume = median(volume), .groups = "drop") %>%
+  ggplot(.) +
+  aes(x = as.numeric(timepoint), y = median.Volume) +
+  geom_boxplot(aes(group = timepoint), outlier.alpha = 0, alpha = 0.1) +
+  geom_jitter(size=0.1, width=0.2, alpha=0.2) +
+  scale_x_continuous(breaks = seq(0, 70, 10)) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  geom_vline(xintercept=c(mins), color="#dd7788", size = 0.3) +
+  scale_y_log10() +
+  labs(x="Time (hours)", y=expression(paste("Median log Volume (", mu, m^3,")")))
+
+fig3 <- cowplot::plot_grid(red, length, width, volume, labels = "AUTO", ncol = 1, nrow = 4, align = "hv", label_size = 10, label_y = c(1,1.02,1.01,1.09))
+fig3
+
+```
+```{r eval=FALSE, include=FALSE}
+ggsave(here::here("figures", "Fig3.png"), plot = fig3, device = "png", width = 6, height = 7.5, units = "in", dpi = 300)
+```
+
+
+#### **Fig 4. Density plots of population size dynamics during a single larval transition**
+```{r Fig4, fig.height=5, fig.width=7.5}
+qlength <- pruneddata %>%
+  dplyr::filter(timepoint >= 32, timepoint <= 40) %>%
+  dplyr::group_by(timepoint) %>%
+  dplyr::mutate(q20_TOF = as.numeric(stats::quantile(TOF, probs = 0.2, na.rm = TRUE)[1]),
+                q40_TOF = as.numeric(stats::quantile(TOF, probs = 0.4, na.rm = TRUE)[1]),
+                q60_TOF = as.numeric(stats::quantile(TOF, probs = 0.6, na.rm = TRUE)[1]),
+                q80_TOF = as.numeric(stats::quantile(TOF, probs = 0.8, na.rm = TRUE)[1])) %>%
+  dplyr::mutate(quant = dplyr::case_when(TOF <= q20_TOF ~ "Q1",
+                                         TOF > q20_TOF & TOF <= q40_TOF ~ "Q2",
+                                         TOF > q40_TOF & TOF <= q60_TOF ~ "Q3",
+                                         TOF > q60_TOF & TOF <= q80_TOF ~ "Q4",
+                                         TOF >= q80_TOF ~ "Q5")) %>%
+  dplyr::group_by(timepoint, quant) %>%
+  dplyr::mutate(hour = as.numeric(timepoint),
+                norm.red.area = red/EXT,
+                Quiescent = dplyr::case_when(norm.red.area <= 0.06 ~ "yes",
+                                             TRUE ~ "no"),
+                feeding = sum(Quiescent == "no"),
+                notfeeding = sum(Quiescent == "yes"),
+                `% Quiescent` = (notfeeding/(notfeeding + feeding))*100,
+                count = n()) %>%
+  dplyr::ungroup() %>% 
+  ggplot() +
+  aes(x = TOF, y = factor(hour), group = timepoint, point_color = `% Quiescent`) +
+  geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
+                      position = position_points_sina(seed = 2),
+                      point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
+  scale_point_color_gradient(name = "% Quiescent", low = "black", high = "red",
+                             breaks = c(10,20,40,60,80), 
+                             labels = c("10","20","40","60","80")) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  theme(legend.position="bottom", legend.background = element_rect(fill="#FFFFFF")) +
+  guides(point_color = guide_legend(override.aes = list(size = 0.001, point_size = 2, point_alpha = 1))) +
+  labs(y ="Time (hours)", x = expression(paste("Length (", mu,"m)")))
+
+qwidth <- pruneddata %>%
+  dplyr::filter(timepoint >= 32, timepoint <= 40) %>%
+  dplyr::group_by(timepoint) %>%
+  dplyr::mutate(q20_norm.EXT = as.numeric(stats::quantile(norm.EXT, probs = 0.2, na.rm = TRUE)[1]),
+                q40_norm.EXT = as.numeric(stats::quantile(norm.EXT, probs = 0.4, na.rm = TRUE)[1]),
+                q60_norm.EXT = as.numeric(stats::quantile(norm.EXT, probs = 0.6, na.rm = TRUE)[1]),
+                q80_norm.EXT = as.numeric(stats::quantile(norm.EXT, probs = 0.8, na.rm = TRUE)[1])) %>%
+  dplyr::mutate(quant = dplyr::case_when(norm.EXT <= q20_norm.EXT ~ "Q1",
+                                         norm.EXT > q20_norm.EXT & norm.EXT <= q40_norm.EXT ~ "Q2",
+                                         norm.EXT > q40_norm.EXT & norm.EXT <= q60_norm.EXT ~ "Q3",
+                                         norm.EXT > q60_norm.EXT & norm.EXT <= q80_norm.EXT ~ "Q4",
+                                         norm.EXT >= q80_norm.EXT ~ "Q5")) %>%
+  dplyr::group_by(timepoint, quant) %>%
+  dplyr::mutate(hour = as.numeric(timepoint),
+                norm.red.area = red/EXT,
+                Quiescent = dplyr::case_when(norm.red.area <= 0.06 ~ "yes",
+                                             TRUE ~ "no"),
+                feeding = sum(Quiescent == "no"),
+                notfeeding = sum(Quiescent == "yes"),
+                `% Quiescent` = (notfeeding/(notfeeding + feeding))*100,
+                count = n()) %>%
+  dplyr::ungroup() %>% 
+  ggplot() +
+  aes(x = norm.EXT, y = factor(hour), group = timepoint, point_color = `% Quiescent`) +
+  geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
+                      position = position_points_sina(seed = 2),
+                      point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
+  scale_point_color_gradient(name = "% Quiescent", low = "black", high = "red",
+                             breaks = c(10,20,40,60,80), 
+                             labels = c("10","20","40","60","80")) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) + guides(point_color = F) +
+  labs(y ="Time (hours)", x = expression(paste("Width (", mu,"m)")))
+
+qvolume <- pruneddata %>%
+  dplyr::filter(timepoint >= 32, timepoint <= 40) %>%
+  dplyr::group_by(timepoint) %>%
+  dplyr::mutate(q20_volume = as.numeric(stats::quantile(volume, probs = 0.2, na.rm = TRUE)[1]),
+                q40_volume = as.numeric(stats::quantile(volume, probs = 0.4, na.rm = TRUE)[1]),
+                q60_volume = as.numeric(stats::quantile(volume, probs = 0.6, na.rm = TRUE)[1]),
+                q80_volume = as.numeric(stats::quantile(volume, probs = 0.8, na.rm = TRUE)[1])) %>%
+  dplyr::mutate(quant = dplyr::case_when(volume <= q20_volume ~ "Q1",
+                                         volume > q20_volume & volume <= q40_volume ~ "Q2",
+                                         volume > q40_volume & volume <= q60_volume ~ "Q3",
+                                         volume > q60_volume & volume <= q80_volume ~ "Q4",
+                                         volume >= q80_volume ~ "Q5")) %>%
+  dplyr::group_by(timepoint, quant) %>%
+  dplyr::mutate(hour = as.numeric(timepoint),
+                norm.red.area = red/EXT,
+                Quiescent = dplyr::case_when(norm.red.area <= 0.06 ~ "yes",
+                                             TRUE ~ "no"),
+                feeding = sum(Quiescent == "no"),
+                notfeeding = sum(Quiescent == "yes"),
+                `% Quiescent` = (notfeeding/(notfeeding + feeding))*100,
+                count = n()) %>%
+  dplyr::ungroup() %>% 
+  ggplot() +
+  aes(x = volume, y = factor(hour), group = timepoint, point_color = `% Quiescent`) +
+  geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
+                      position = position_points_sina(seed = 2),
+                      point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
+  scale_point_color_gradient(name = "% Quiescent", low = "black", high = "red",
+                             breaks = c(10,20,40,60,80), 
+                             labels = c("10","20","40","60","80")) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) + guides(point_color = F) +
+  labs(y ="Time (hours)", x = expression(paste("Volume (", mu,m^3,")"))) 
+
+fig4 <- cowplot::plot_grid(qlength, qwidth, qvolume, labels = c("A", "B", "C"), ncol = 3, nrow = 1, align = "hv", axis = "tblr", label_size = 10)
+fig4
+
+```
+```{r eval=FALSE, include=FALSE}
+ggsave(here::here("figures", "Fig4.png"), plot = fig4, device = "png", width = 7.5, height = 6, units = "in", dpi = 300)
+```
+
+
+
+
+
+

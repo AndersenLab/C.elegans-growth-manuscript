@@ -67,7 +67,7 @@ raw.volume <- rawdata %>%
   aes(x = hour, y = volume) +
   geom_jitter(size = 0.01, width = 0.2, alpha = 0.009)+
   scale_x_continuous(breaks = seq(0, 70, 10)) +
-  labs(x="Time (hours)", y = expression(paste("log Volume (", mu,m^3,")"))) +
+  labs(x="Time (hours)", y = expression(paste("Volume (", mu,m^3,")"))) +
   theme_cowplot(font_size = 10, rel_small = 8/10) +
   scale_y_log10()
 
@@ -76,7 +76,7 @@ figS1
 
 ```
 ```{r eval=FALSE, include=FALSE}
-ggplot2::ggsave(here::here("figures", "S1Fig.png"), plot = figS1, device = "png", width = 5.2, height = 5.5, units = "in", dpi = 300)
+ggplot2::ggsave(here::here("figures", "supplement", "S1Fig.png"), plot = figS1, device = "png", width = 5.2, height = 5.5, units = "in", dpi = 300)
 ```
 
 
@@ -545,7 +545,7 @@ qvolume <- pruneddata %>%
                              breaks = c(10,20,40,60,80), 
                              labels = c("10","20","40","60","80")) +
   theme_cowplot(font_size = 10, rel_small = 8/10) + guides(point_color = F) +
-  labs(y ="Time (hours)", x = expression(paste("log Volume (", mu,m^3,")"))) 
+  labs(y ="Time (hours)", x = expression(paste("Volume (", mu,m^3,")"))) 
 
 figS7 <- cowplot::plot_grid(qlength, qwidth, qvolume, labels = "AUTO", ncol = 3, nrow = 1, align = "hv", axis = "tblr",label_size = 12)
 figS7

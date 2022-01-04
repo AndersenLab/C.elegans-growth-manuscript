@@ -186,7 +186,7 @@ ggsave(here::here("figures", "Fig3.png"), plot = fig3, device = "png", width = 6
 
 
 #### **Fig 4. Density plots of population size dynamics during a single larval transition**
-```{r Fig4, fig.height=5, fig.width=7.5}
+```{r Fig4, fig.height=10, fig.width=6}
 qlength <- pruneddata %>%
   dplyr::filter(timepoint >= 32, timepoint <= 40) %>%
   dplyr::group_by(timepoint) %>%
@@ -217,6 +217,7 @@ qlength <- pruneddata %>%
   scale_point_color_gradient(name = "% Quiescent", low = "black", high = "red",
                              breaks = c(10,20,40,60,80), 
                              labels = c("10","20","40","60","80")) +
+  geom_hline(yintercept=c("36"), color="red") +
   theme_cowplot(font_size = 10, rel_small = 8/10) +
   theme(legend.position="bottom", legend.background = element_rect(fill="#FFFFFF")) +
   guides(point_color = guide_legend(override.aes = list(size = 0.001, point_size = 2, point_alpha = 1))) +
@@ -253,6 +254,7 @@ qwidth <- pruneddata %>%
   scale_point_color_gradient(name = "% Quiescent", low = "black", high = "red",
                              breaks = c(10,20,40,60,80), 
                              labels = c("10","20","40","60","80")) +
+  geom_hline(yintercept=c("36"), color="red") +
   theme_cowplot(font_size = 10, rel_small = 8/10) + guides(point_color = F) +
   labs(y ="Time (hours)", x = expression(paste("Width (", mu,"m)"))) +
   geom_hline(yintercept="36", color="red", size = 0.4)
@@ -287,11 +289,29 @@ qvolume <- pruneddata %>%
   scale_point_color_gradient(name = "% Quiescent", low = "black", high = "red",
                              breaks = c(10,20,40,60,80), 
                              labels = c("10","20","40","60","80")) +
+  geom_hline(yintercept=c("36"), color="red") +
   theme_cowplot(font_size = 10, rel_small = 8/10) + guides(point_color = F) +
   labs(y ="Time (hours)", x = expression(paste("Volume (", mu,m^3,")"))) +
   geom_hline(yintercept="36", color="red", size = 0.4)
 
+lvw <- pruneddata %>%
+  dplyr::filter(timepoint < 55) %>%
+  dplyr::group_by(timepoint, replicate, row, col) %>%
+  dplyr::summarize(median.red = median(red), median.EXT = median(EXT), median.norm.red.area = median(red/EXT),
+                   median.TOF = median(TOF), median.norm.EXT = median(norm.EXT), .groups = "drop") %>%
+  dplyr::mutate(`Quiescent?` = dplyr::case_when(median.norm.red.area <= 0.06 & timepoint > 10 ~ "yes",
+                                             TRUE ~ "no")) %>%
+  ggplot(.) +
+  aes(x = median.TOF, y = median.norm.EXT, color = `Quiescent?`) +
+  geom_point(size = 0.4, alpha = 0.5) + 
+  scale_color_manual(values = c("black", "red")) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  labs(x = expression(paste("Median Length (", mu,"m)")), 
+       y = expression(paste("Median Width (", mu,"m)")))
+
 fig4 <- cowplot::plot_grid(qlength, qwidth, qvolume, labels = c("A", "B", "C"), ncol = 3, nrow = 1, align = "hv", axis = "tblr", label_size = 10)
+
+fig4 <- cowplot::plot_grid(fig4, lvw, labels = c(NA, "D"), ncol = 1, nrow = 2, align = "hv", axis = "tblr", label_size = 10)
 fig4
 
 ```
@@ -299,6 +319,40 @@ fig4
 ggsave(here::here("figures", "Fig4.png"), plot = fig4, device = "png", width = 7.5, height = 6, units = "in", dpi = 300)
 ```
 
+```{r Fig7}
+# raw data
+pruneddata %>%
+  dplyr::filter(timepoint < 50) %>%
+  ggplot(.) +
+  xlim(NA,1000) +
+  aes(x = TOF, y = norm.EXT) +
+  geom_point(size = 0.1, alpha = 0.05) + 
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  labs(x = expression(paste("Length (", mu,"m)")), 
+       y = expression(paste("Width (", mu,"m)")))
+```
+
+
+```{r Fig7}
+# median well data
+
+
+pruneddata %>%
+  dplyr::filter(timepoint > 13 , timepoint < 30) %>%
+  dplyr::group_by(timepoint, replicate, row, col) %>%
+  dplyr::summarize(median.red = median(red), median.EXT = median(EXT), median.norm.red.area = median(red/EXT),
+                   median.TOF = median(TOF), median.norm.EXT = median(norm.EXT), .groups = "drop") %>%
+  dplyr::mutate(`Quiescent?` = dplyr::case_when(median.norm.red.area <= 0.06 & timepoint > 10 ~ "yes",
+                                             TRUE ~ "no")) %>%
+  ggplot(.) +
+  aes(x = median.TOF, y = median.norm.EXT, color = `Quiescent?`) +
+  geom_point(size = 0.8, alpha = 0.8) + 
+  scale_color_manual(values = c("black", "red")) +
+  guides(color = F) +
+  theme_cowplot(font_size = 10, rel_small = 8/10) +
+  labs(x = expression(paste("Median Length (", mu,"m)")), 
+       y = expression(paste("Median Width (", mu,"m)")))
+```
 
 
 

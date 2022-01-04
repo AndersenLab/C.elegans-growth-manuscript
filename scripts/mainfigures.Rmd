@@ -309,36 +309,8 @@ lvw <- pruneddata %>%
   labs(x = expression(paste("Median Length (", mu,"m)")), 
        y = expression(paste("Median Width (", mu,"m)")))
 
-fig4 <- cowplot::plot_grid(qlength, qwidth, qvolume, labels = c("A", "B", "C"), ncol = 3, nrow = 1, align = "hv", axis = "tblr", label_size = 10)
-
-fig4 <- cowplot::plot_grid(fig4, lvw, labels = c(NA, "D"), ncol = 1, nrow = 2, align = "hv", axis = "tblr", label_size = 10)
-fig4
-
-```
-```{r eval=FALSE, include=FALSE}
-ggsave(here::here("figures", "Fig4.png"), plot = fig4, device = "png", width = 7.5, height = 6, units = "in", dpi = 300)
-```
-
-```{r Fig7}
-# raw data
-pruneddata %>%
-  dplyr::filter(timepoint < 50) %>%
-  ggplot(.) +
-  xlim(NA,1000) +
-  aes(x = TOF, y = norm.EXT) +
-  geom_point(size = 0.1, alpha = 0.05) + 
-  theme_cowplot(font_size = 10, rel_small = 8/10) +
-  labs(x = expression(paste("Length (", mu,"m)")), 
-       y = expression(paste("Width (", mu,"m)")))
-```
-
-
-```{r Fig7}
-# median well data
-
-
-pruneddata %>%
-  dplyr::filter(timepoint > 13 , timepoint < 30) %>%
+lvw <- pruneddata %>%
+  dplyr::filter(timepoint < 55) %>%
   dplyr::group_by(timepoint, replicate, row, col) %>%
   dplyr::summarize(median.red = median(red), median.EXT = median(EXT), median.norm.red.area = median(red/EXT),
                    median.TOF = median(TOF), median.norm.EXT = median(norm.EXT), .groups = "drop") %>%
@@ -346,13 +318,23 @@ pruneddata %>%
                                              TRUE ~ "no")) %>%
   ggplot(.) +
   aes(x = median.TOF, y = median.norm.EXT, color = `Quiescent?`) +
-  geom_point(size = 0.8, alpha = 0.8) + 
-  scale_color_manual(values = c("black", "red")) +
-  guides(color = F) +
+  geom_point(size = 0.4, alpha = 0.5) + 
+  scale_color_manual(values = c("black", "#AE5DA6")) +
   theme_cowplot(font_size = 10, rel_small = 8/10) +
   labs(x = expression(paste("Median Length (", mu,"m)")), 
        y = expression(paste("Median Width (", mu,"m)")))
+
+fig4 <- cowplot::plot_grid(qlength, qwidth, qvolume, labels = c("A", "B", "C"), ncol = 3, nrow = 1, align = "hv", axis = "tblr", label_size = 10)
+
+fig4 <- cowplot::plot_grid(fig4, lvw, labels = c(NA, "D"), ncol = 1, nrow = 2, label_size = 10, rel_heights = c(1.2,0.8))
+fig4
+
 ```
+```{r eval=FALSE, include=FALSE}
+ggsave(here::here("figures", "Fig4.png"), plot = fig4, device = "png", width = 8, height = 12, units = "in", dpi = 300)
+```
+
+
 
 
 

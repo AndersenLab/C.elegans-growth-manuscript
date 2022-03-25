@@ -210,7 +210,8 @@ qlength <- pruneddata %>%
                 count = n()) %>%
   dplyr::ungroup() %>% 
   ggplot() +
-  aes(x = TOF, y = factor(hour), group = timepoint, point_color = `% Quiescent`) +
+  aes(x = rev(TOF), y = factor(rev(hour), levels = c(40,39,38,37,36,35,34,33,32)), 
+      group = rev(timepoint), point_color = `% Quiescent`) +
   geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
                       position = position_points_sina(seed = 2),
                       point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
@@ -247,7 +248,8 @@ qwidth <- pruneddata %>%
                 count = n()) %>%
   dplyr::ungroup() %>% 
   ggplot() +
-  aes(x = norm.EXT, y = factor(hour), group = timepoint, point_color = `% Quiescent`) +
+  aes(x = rev(norm.EXT), y = factor(rev(hour), levels = c(40,39,38,37,36,35,34,33,32)), 
+      group = rev(timepoint), point_color = `% Quiescent`) +
   geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
                       position = position_points_sina(seed = 2),
                       point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
@@ -282,7 +284,8 @@ qvolume <- pruneddata %>%
                 count = n()) %>%
   dplyr::ungroup() %>% 
   ggplot() +
-  aes(x = volume, y = factor(hour), group = timepoint, point_color = `% Quiescent`) +
+  aes(x = rev(volume), y = factor(rev(hour), levels = c(40,39,38,37,36,35,34,33,32)), 
+      group = rev(timepoint), point_color = `% Quiescent`) +
   geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
                       position = position_points_sina(seed = 2),
                       point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
@@ -331,7 +334,7 @@ fig4
 
 ```
 ```{r eval=FALSE, include=FALSE}
-ggsave(here::here("figures", "Fig4.png"), plot = fig4, device = "png", width = 8, height = 12, units = "in", dpi = 300)
+ggsave(here::here("figures", "Fig4-2.png"), plot = fig4, device = "png", width = 8, height = 12, units = "in", dpi = 300)
 ```
 
 

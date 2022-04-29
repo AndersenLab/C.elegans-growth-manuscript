@@ -220,7 +220,7 @@ redvTOF <- pruneddata %>%
   geom_smooth(span = 0.1, se = F, size = 0.5, method = "loess", color = "#4682b4") +
   scale_x_continuous(breaks = seq(0, 70, 10)) +
   theme_cowplot(font_size = 10, rel_small = 8/10) +
-  labs(x="Time (hours)", y = "Median red/TOF")
+  labs(x="Time (hours)", y = "Median red/length")
 
 redvEXT <- pruneddata %>%
   dplyr::group_by(replicate, timepoint, row, col) %>%
@@ -232,7 +232,7 @@ redvEXT <- pruneddata %>%
   geom_smooth(span = 0.1, se = F, size = 0.5, method = "loess", color = "#4682b4") +
   scale_x_continuous(breaks = seq(0, 70, 10)) +
   theme_cowplot(font_size = 10, rel_small = 8/10) +
-  labs(x="Time (hours)", y = "Median red/EXT")
+  labs(x="Time (hours)", y = "Median red/area")
 
 redvVol <- pruneddata %>%
   dplyr::group_by(replicate, timepoint, row, col) %>%

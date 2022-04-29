@@ -210,8 +210,8 @@ qlength <- pruneddata %>%
                 count = n()) %>%
   dplyr::ungroup() %>% 
   ggplot() +
-  aes(x = rev(TOF), y = factor(rev(hour), levels = c(40,39,38,37,36,35,34,33,32)), 
-      group = rev(timepoint), point_color = `% Quiescent`) +
+  aes(x = TOF, y = timepoint, 
+      group = timepoint, point_color = `% Quiescent`) +
   geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
                       position = position_points_sina(seed = 2),
                       point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
@@ -223,7 +223,7 @@ qlength <- pruneddata %>%
   theme(legend.position="bottom", legend.background = element_rect(fill="#FFFFFF")) +
   guides(point_color = guide_legend(override.aes = list(size = 0.001, point_size = 2, point_alpha = 1))) +
   labs(y ="Time (hours)", x = expression(paste("Length (", mu,"m)"))) +
-  geom_hline(yintercept="36", color="red", size = 0.4)
+  geom_hline(yintercept="36", color="red", size = 0.4) + scale_y_discrete(limits = rev)
 
 qwidth <- pruneddata %>%
   dplyr::filter(timepoint >= 32, timepoint <= 40) %>%
@@ -248,8 +248,8 @@ qwidth <- pruneddata %>%
                 count = n()) %>%
   dplyr::ungroup() %>% 
   ggplot() +
-  aes(x = rev(norm.EXT), y = factor(rev(hour), levels = c(40,39,38,37,36,35,34,33,32)), 
-      group = rev(timepoint), point_color = `% Quiescent`) +
+  aes(x = norm.EXT, y = timepoint, 
+      group = timepoint, point_color = `% Quiescent`) +
   geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
                       position = position_points_sina(seed = 2),
                       point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
@@ -259,7 +259,7 @@ qwidth <- pruneddata %>%
   geom_hline(yintercept=c("36"), color="red") +
   theme_cowplot(font_size = 10, rel_small = 8/10) + guides(point_color = F) +
   labs(y ="Time (hours)", x = expression(paste("Width (", mu,"m)"))) +
-  geom_hline(yintercept="36", color="red", size = 0.4)
+  geom_hline(yintercept="36", color="red", size = 0.4) + scale_y_discrete(limits = rev)
 
 qvolume <- pruneddata %>%
   dplyr::filter(timepoint >= 32, timepoint <= 40) %>%
@@ -284,8 +284,8 @@ qvolume <- pruneddata %>%
                 count = n()) %>%
   dplyr::ungroup() %>% 
   ggplot() +
-  aes(x = rev(volume), y = factor(rev(hour), levels = c(40,39,38,37,36,35,34,33,32)), 
-      group = rev(timepoint), point_color = `% Quiescent`) +
+  aes(x = volume, y = timepoint, 
+      group = timepoint, point_color = `% Quiescent`) +
   geom_density_ridges(alpha = 0.2, quantile_lines = T, quantiles = 5, jittered_points = T, 
                       position = position_points_sina(seed = 2),
                       point_alpha = 0.4, point_size = 0.4, scale = 0.99) +
@@ -295,7 +295,7 @@ qvolume <- pruneddata %>%
   geom_hline(yintercept=c("36"), color="red") +
   theme_cowplot(font_size = 10, rel_small = 8/10) + guides(point_color = F) +
   labs(y ="Time (hours)", x = expression(paste("Volume (", mu,m^3,")"))) +
-  geom_hline(yintercept="36", color="red", size = 0.4)
+  geom_hline(yintercept="36", color="red", size = 0.4) + scale_y_discrete(limits = rev)
 
 lvw <- pruneddata %>%
   dplyr::filter(timepoint < 55) %>%
